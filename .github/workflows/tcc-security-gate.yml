@@ -1,0 +1,443 @@
+name: TCC - Security Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: tcc-security-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sast-sonar:
+    name: SAST - SonarCloud
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      INTERNAL_TOKEN: ci-internal-token
+      JWT_SECRET_KEY: ci-test-secret
+      BACKEND_URL: http://localhost:3333
+      QUIZ_SERVICE_URL: http://localhost:3334
+      AI_URL: ""
+      CORS_ORIGINS: "*"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Prisma generate
+        if: hashFiles('prisma/schema.prisma') != ''
+        run: npx prisma generate
+      - run: npm run build || true
+      - run: npm test -- --coverage --passWithNoTests
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Aguardar SonarCloud Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  sast-codeql:
+    name: SAST - CodeQL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@e429ea58a9912cadc53f8132ad35562b54de1b30
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+      - name: Analisar com CodeQL
+        uses: github/codeql-action/analyze@e429ea58a9912cadc53f8132ad35562b54de1b30
+        with:
+          category: "/language:javascript-typescript"
+          output: codeql-results
+      - name: Bloquear achados High/Critical
+        run: |
+          ACHADOS=$(jq -s '[
+            .[].runs[] | . as $run
+            | ([($run.tool.driver.rules // [])[]] + [($run.tool.extensions // [])[] | (.rules // [])[]])
+            | map({key: .id, value: ((.properties["security-severity"] // "0") | tonumber)})
+            | from_entries as $sev
+            | ($run.results // [])[]
+            | select(($sev[.ruleId] // 0) >= 7.0)
+          ] | length' codeql-results/*.sarif)
+          echo "Achados CodeQL High/Critical: $ACHADOS"
+          if [ "$ACHADOS" -gt 0 ]; then
+            echo "::error::CodeQL encontrou $ACHADOS achado(s) High/Critical."
+            exit 1
+          fi
+
+  sca:
+    name: SCA - npm audit + Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: ".nvmrc"
+      - run: npm ci
+      - name: npm audit (high+)
+        id: npm-audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+      - name: npm audit JSON
+        if: always()
+        run: npm audit --json > npm-audit-report.json || true
+      - name: Trivy filesystem scan
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          limit-severities-for-sarif: true
+          exit-code: "1"
+      - name: Upload SARIF do Trivy
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@e429ea58a9912cadc53f8132ad35562b54de1b30
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+      - name: Upload npm audit JSON
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: npm-audit-report
+          path: npm-audit-report.json
+          retention-days: 30
+      - name: Avaliar resultado do SCA
+        if: always()
+        run: |
+          echo "npm audit: ${{ steps.npm-audit.outcome }}"
+          echo "Trivy:     ${{ steps.trivy.outcome }}"
+          if [ "${{ steps.npm-audit.outcome }}" != "success" ] || [ "${{ steps.trivy.outcome }}" != "success" ]; then
+            echo "::error::Vulnerabilidades HIGH/CRITICAL encontradas nas dependencias."
+            exit 1
+          fi
+
+  secrets-scan:
+    name: Secrets - Gitleaks
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+      - name: Instalar Gitleaks
+        run: |
+          TARBALL="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$TARBALL" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
+          echo "${GITLEAKS_SHA256}  ${TARBALL}" | sha256sum -c -
+          tar -xzf "$TARBALL" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Gitleaks - commits do PR
+        run: |
+          gitleaks git . \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
+            --redact \
+            --verbose \
+            --report-format sarif \
+            --report-path gitleaks-results.sarif
+      - name: Upload SARIF do Gitleaks
+        if: always() && hashFiles('gitleaks-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@e429ea58a9912cadc53f8132ad35562b54de1b30
+        with:
+          sarif_file: gitleaks-results.sarif
+          category: gitleaks
+
+  dast-zap:
+    name: DAST - OWASP ZAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: anatoquizup-dast
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Definir DAST_DIR
+        run: echo "DAST_DIR=$RUNNER_TEMP/dast" >> "$GITHUB_ENV"
+
+      - name: Clonar servicos downstream
+        run: |
+          mkdir -p "$DAST_DIR"
+          git clone --depth 1 https://github.com/fga-eps-mds/2026-2-AnatoQuizUp-Usuario-Service "$DAST_DIR/usuario-service"
+          git clone --depth 1 https://github.com/fga-eps-mds/2026-2-AnatoQuizUp-Quiz-Service "$DAST_DIR/quiz-service"
+
+      - name: Gerar segredos efemeros
+        run: |
+          JWT_SECRET=$(openssl rand -hex 32)
+          INTERNAL=$(openssl rand -hex 32)
+          echo "::add-mask::$JWT_SECRET"
+          echo "::add-mask::$INTERNAL"
+          echo "DAST_JWT_SECRET_KEY=$JWT_SECRET" >> "$GITHUB_ENV"
+          echo "DAST_INTERNAL_TOKEN=$INTERNAL" >> "$GITHUB_ENV"
+
+      - name: Criar docker-compose.dast.yml
+        run: |
+          cat > "$DAST_DIR/init-db.sql" <<'SQL'
+          CREATE DATABASE anatoquizup_usuario;
+          CREATE DATABASE anatoquizup_quiz;
+          SQL
+
+          cat > "$DAST_DIR/docker-compose.dast.yml" <<'YAML'
+          services:
+            postgres:
+              image: postgres:16-alpine
+              environment:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: postgres
+              volumes:
+                - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+              healthcheck:
+                test: ["CMD-SHELL", "pg_isready -U postgres -d anatoquizup_quiz"]
+                interval: 5s
+                timeout: 5s
+                retries: 20
+
+            minio:
+              image: nginx:alpine
+              command: sh -c "echo 'server { listen 9000; listen 9001; location / { return 200 ok; } }' > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+              healthcheck:
+                test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/"]
+                interval: 5s
+                timeout: 5s
+                retries: 20
+
+            usuario-service:
+              build:
+                context: ./usuario-service
+              environment:
+                NODE_ENV: production
+                PORT: "3333"
+                DATABASE_URL: postgresql://postgres:postgres@postgres:5432/anatoquizup_usuario?schema=public
+                JWT_SECRET_KEY: ${DAST_JWT_SECRET_KEY}
+                JWT_REFRESH_SECRET_KEY: ${DAST_JWT_SECRET_KEY}-refresh
+                JWT_PASSWORD_REDEFINITION_SECRET_KEY: ${DAST_JWT_SECRET_KEY}-reset
+                INTERNAL_TOKEN: ${DAST_INTERNAL_TOKEN}
+                BREVO_API_KEY: dast-dummy-key
+                EMAIL_FROM: noreply@example.com
+                FRONTEND_PROD_URL: http://localhost:5173
+                CORS_ORIGINS: "*"
+              depends_on:
+                postgres: { condition: service_healthy }
+              healthcheck:
+                test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3333/health || exit 1"]
+                interval: 5s
+                timeout: 5s
+                retries: 30
+                start_period: 30s
+
+            quiz-service:
+              build:
+                context: ./quiz-service
+              command: sh -c "npx prisma migrate deploy && node dist/prisma/seed.js && node dist/src/server.js"
+              environment:
+                NODE_ENV: production
+                PORT: "3334"
+                DATABASE_URL: postgresql://postgres:postgres@postgres:5432/anatoquizup_quiz?schema=public
+                JWT_SECRET_KEY: ${DAST_JWT_SECRET_KEY}
+                INTERNAL_TOKEN: ${DAST_INTERNAL_TOKEN}
+                CORS_ORIGINS: "*"
+                MINIO_ENDPOINT: http://minio
+                MINIO_API_PORT: "9000"
+                MINIO_CONSOLE_PORT: "9001"
+                MINIO_ROOT_USER: minioadmin
+                MINIO_ROOT_PASSWORD: minioadmin
+              depends_on:
+                postgres: { condition: service_healthy }
+                minio: { condition: service_healthy }
+              healthcheck:
+                test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3334/health || exit 1"]
+                interval: 5s
+                timeout: 5s
+                retries: 30
+                start_period: 30s
+
+            bff:
+              build:
+                context: ${GITHUB_WORKSPACE}
+              environment:
+                NODE_ENV: production
+                PORT: "4000"
+                BACKEND_URL: http://usuario-service:3333
+                QUIZ_SERVICE_URL: http://quiz-service:3334
+                AI_URL: ""
+                JWT_SECRET_KEY: ${DAST_JWT_SECRET_KEY}
+                INTERNAL_TOKEN: ${DAST_INTERNAL_TOKEN}
+                CORS_ORIGINS: "*"
+              ports: ["4000:4000"]
+              depends_on:
+                usuario-service: { condition: service_healthy }
+                quiz-service: { condition: service_healthy }
+              healthcheck:
+                test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health || exit 1"]
+                interval: 5s
+                timeout: 5s
+                retries: 30
+                start_period: 10s
+          YAML
+
+      - name: Subir stack e aguardar healthchecks
+        run: docker compose -f "$DAST_DIR/docker-compose.dast.yml" up -d --build --wait --wait-timeout 600
+
+      - name: Logs da stack em caso de falha
+        if: failure()
+        run: docker compose -f "$DAST_DIR/docker-compose.dast.yml" logs --no-color
+
+      - name: Obter ID real do admin no banco
+        run: |
+          ADMIN_ID=$(docker compose -f "$DAST_DIR/docker-compose.dast.yml" exec -T postgres \
+            psql -U postgres -d anatoquizup_usuario -tAc \
+            "SELECT id FROM usuarios WHERE email = 'admin@anatoquizup.com' AND \"excluidoEm\" IS NULL LIMIT 1" \
+            | tr -d '[:space:]')
+          if [ -z "$ADMIN_ID" ]; then
+            echo "::error::Usuario admin@anatoquizup.com nao encontrado no banco."
+            docker compose -f "$DAST_DIR/docker-compose.dast.yml" exec -T postgres \
+              psql -U postgres -d anatoquizup_usuario -c "SELECT id, email, perfil, status FROM usuarios"
+            exit 1
+          fi
+          echo "Admin ID: $ADMIN_ID"
+          echo "DAST_ADMIN_ID=$ADMIN_ID" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      - name: Gerar JWT de teste
+        run: |
+          mkdir -p "$RUNNER_TEMP/jwt" && cd "$RUNNER_TEMP/jwt"
+          npm init -y >/dev/null && npm install --no-save --silent jsonwebtoken@9
+          TOKEN=$(node -e '
+            const jwt = require("jsonwebtoken");
+            process.stdout.write(jwt.sign(
+              {
+                id: process.env.DAST_ADMIN_ID,
+                email: "admin@anatoquizup.com",
+                papel: "ADMIN",
+                status: "ATIVO"
+              },
+              process.env.DAST_JWT_SECRET_KEY,
+              { expiresIn: "1h" }
+            ));
+          ')
+          echo "::add-mask::$TOKEN"
+          echo "DAST_BEARER_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: ZAP Baseline Scan (autenticado)
+        run: |
+          mkdir -p zap-report zap-config
+          chmod 777 zap-report
+
+          cat > zap-config/replacer.prop <<EOF
+          replacer.full_list(0).description=auth-bearer
+          replacer.full_list(0).enabled=true
+          replacer.full_list(0).matchtype=REQ_HEADER
+          replacer.full_list(0).matchstr=Authorization
+          replacer.full_list(0).regex=false
+          replacer.full_list(0).replacement=Bearer ${DAST_BEARER_TOKEN}
+          EOF
+
+          set +e
+          docker run --rm --network host \
+            -v "$PWD/zap-report:/zap/wrk:rw" \
+            -v "$PWD/zap-config:/zap/config:ro" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "http://localhost:4000/api/v1/" \
+              -r zap-report.html \
+              -J zap-report.json \
+              -w zap-report.md \
+              -I \
+              -z "-configfile /zap/config/replacer.prop"
+          ZAP_EXIT=$?
+          set -e
+          rm -f zap-config/replacer.prop
+
+          if [ "$ZAP_EXIT" -eq 1 ] || [ "$ZAP_EXIT" -eq 3 ]; then
+            echo "::error::ZAP Baseline terminou com codigo $ZAP_EXIT."
+            exit 1
+          fi
+
+          ALTOS=$(jq '[.site[]?.alerts[]? | select(.riskcode == "3")] | length' zap-report/zap-report.json)
+          echo "Alertas ZAP de risco High: $ALTOS"
+          if [ "$ALTOS" -gt 0 ]; then
+            echo "::error::ZAP encontrou $ALTOS alerta(s) de risco High."
+            exit 1
+          fi
+
+      - name: Upload do relatorio ZAP
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zap-report
+          path: zap-report/
+          retention-days: 30
+
+      - name: Derrubar stack
+        if: always()
+        run: docker compose -f "$DAST_DIR/docker-compose.dast.yml" down -v --remove-orphans
+
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [sast-sonar, sast-codeql, sca, secrets-scan, dast-zap]
+    steps:
+      - name: Avaliar resultado dos jobs
+        env:
+          SAST_SONAR: ${{ needs.sast-sonar.result }}
+          SAST_CODEQL: ${{ needs.sast-codeql.result }}
+          SCA: ${{ needs.sca.result }}
+          SECRETS_SCAN: ${{ needs.secrets-scan.result }}
+          DAST_ZAP: ${{ needs.dast-zap.result }}
+        run: |
+          FAILED=0
+          {
+            echo "## Security Gate"
+            echo ""
+            echo "| Job | Resultado |"
+            echo "|-----|-----------|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for pair in \
+            "sast-sonar:$SAST_SONAR" \
+            "sast-codeql:$SAST_CODEQL" \
+            "sca:$SCA" \
+            "secrets-scan:$SECRETS_SCAN" \
+            "dast-zap:$DAST_ZAP"; do
+            JOB="${pair%%:*}"
+            RESULT="${pair#*:}"
+            echo "| $JOB | $RESULT |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$RESULT" != "success" ]; then
+              echo "::error::$JOB terminou com resultado '$RESULT'."
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Security Gate REPROVADO."
+            exit 1
+          fi
+          echo "::notice::Security Gate APROVADO."
