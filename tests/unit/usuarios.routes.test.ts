@@ -60,4 +60,28 @@ describe("Usuarios Router (BFF)", () => {
     expect(responseIds.status).toBe(200);
     expect(responseAlunos.status).toBe(200);
   });
+
+  //TESTES PARA A ROTA DO AVATAR 
+
+  it("deve encaminhar a rota /meu-avatar para o proxy quando autenticado", async () => {
+    const response = await request(app).get("/api/v1/usuarios/meu-avatar");
+
+    expect(middlewareAutenticacao).toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ mensagem: "Passou pelo proxy de usuarios!" });
+  });
+
+  it("deve barrar a requisicao para /meu-avatar se o usuario nao estiver autenticado", async () => {
+    (middlewareAutenticacao as jest.Mock).mockImplementationOnce(
+      (_req: Request, res: Response) => {
+        res.status(401).json({ erro: "Nao autorizado" });
+      },
+    );
+
+    const response = await request(app).get("/api/v1/usuarios/meu-avatar");
+
+    expect(middlewareAutenticacao).toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ erro: "Nao autorizado" });
+  });
 });
