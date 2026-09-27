@@ -31,7 +31,7 @@ jobs:
           echo RELEASE_FIX=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'FIX RELEASE') }} >> ./sonar_scripts/.env
           echo DEVELOP=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'DEVELOP') }} >> ./sonar_scripts/.env
           echo REPO=${{ github.event.repository.name }} >> ./sonar_scripts/.env
-          echo REPO_DOC=2026-1-AnatoQuizUp-Doc >> ./sonar_scripts/.env
+          echo REPO_DOC=2026-2-AnatoQuizUp-Doc >> ./sonar_scripts/.env
 
       - name: Criar diretório
         run: mkdir -p analytics-raw-data
@@ -43,7 +43,7 @@ jobs:
         run: |
           git config --global user.email "${{secrets.USER_EMAIL}}"
           git config --global user.name "${{secrets.USER_NAME}}"
-          git clone --single-branch --branch main "https://x-access-token:${{secrets.DOC_PUSH_TOKEN}}@github.com/fga-eps-mds/2026-1-AnatoQuizUp-Doc.git" doc
+          git clone --single-branch --branch main "https://x-access-token:${{secrets.DOC_PUSH_TOKEN}}@github.com/fga-eps-mds/2026-2-AnatoQuizUp-Doc.git" doc
           mkdir -p doc/analytics-raw-data/BFF
           cp -R analytics-raw-data/*.json doc/analytics-raw-data/BFF
           cd doc
