@@ -322,6 +322,60 @@ describe("/api/v1/questoes", () => {
   });
 });
 
+describe("/api/v1/loja - identidade e contrato do proxy", () => {
+  it("rejeita consulta sem JWT e nao chama o Quiz Service", async () => {
+    const resposta = await request(aplicacao).get("/api/v1/loja/meu-historico");
+
+    expect(resposta.status).toBe(401);
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it("repassa metodo e query e substitui identidade forjada pela identidade do JWT", async () => {
+    quizMock.request.mockResolvedValue({
+      status: 200,
+      data: {
+        dados: [{ id: "compra-u1", acao: "COMPRA", custoCompra: 20 }],
+        metadados: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      },
+      headers: { "content-type": "application/json" },
+    });
+
+    const resposta = await request(aplicacao)
+      .get("/api/v1/loja/meu-historico?page=1&usuarioId=u2")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .set("X-User-Id", "u2")
+      .set("X-Internal-Token", "forjado");
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.dados).toEqual([{ id: "compra-u1", acao: "COMPRA", custoCompra: 20 }]);
+    const args = quizMock.request.mock.calls[0][0];
+    expect(args.method).toBe("GET");
+    expect(args.url).toBe("/api/v1/loja/meu-historico?page=1&usuarioId=u2");
+    expect(args.headers.authorization).toMatch(/^Bearer /);
+    expect(args.headers["x-user-id"]).toBe("u1");
+    expect(args.headers["x-internal-token"]).toBeDefined();
+    expect(args.headers["x-internal-token"]).not.toBe("forjado");
+  });
+
+  it("preserva status e corpo de erro do Quiz Service em uma chamada existente", async () => {
+    const erro = { erro: { codigo: "REQUISICAO_INVALIDA", mensagem: "Item indisponivel." } };
+    quizMock.request.mockResolvedValue({ status: 422, data: erro, headers: {} });
+
+    const resposta = await request(aplicacao)
+      .post("/api/v1/loja/usar")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ itemLojaId: "item-1" });
+
+    expect(resposta.status).toBe(422);
+    expect(resposta.body).toEqual(erro);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "POST",
+      url: "/api/v1/loja/usar",
+      data: { itemLojaId: "item-1" },
+    });
+  });
+});
+
 describe("/api/v1/ia - placeholder", () => {
   it("retorna 503 IA_INDISPONIVEL", async () => {
     const resposta = await request(aplicacao)
