@@ -324,7 +324,7 @@ describe("/api/v1/questoes", () => {
 
 describe("/api/v1/loja - identidade e contrato do proxy", () => {
   it("rejeita consulta sem JWT e nao chama o Quiz Service", async () => {
-    const resposta = await request(aplicacao).get("/api/v1/loja/meu-historico-usos");
+    const resposta = await request(aplicacao).get("/api/v1/loja/meu-historico");
 
     expect(resposta.status).toBe(401);
     expect(quizMock.request).not.toHaveBeenCalled();
@@ -333,21 +333,24 @@ describe("/api/v1/loja - identidade e contrato do proxy", () => {
   it("repassa metodo e query e substitui identidade forjada pela identidade do JWT", async () => {
     quizMock.request.mockResolvedValue({
       status: 200,
-      data: { dados: [{ id: "uso-u1" }], metadados: { page: 1, limit: 10, total: 1, totalPages: 1 } },
+      data: {
+        dados: [{ id: "compra-u1", acao: "COMPRA", custoCompra: 20 }],
+        metadados: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      },
       headers: { "content-type": "application/json" },
     });
 
     const resposta = await request(aplicacao)
-      .get("/api/v1/loja/meu-historico-usos?page=1&usuarioId=u2")
+      .get("/api/v1/loja/meu-historico?page=1&usuarioId=u2")
       .set("Authorization", `Bearer ${tokenValido()}`)
       .set("X-User-Id", "u2")
       .set("X-Internal-Token", "forjado");
 
     expect(resposta.status).toBe(200);
-    expect(resposta.body.dados).toEqual([{ id: "uso-u1" }]);
+    expect(resposta.body.dados).toEqual([{ id: "compra-u1", acao: "COMPRA", custoCompra: 20 }]);
     const args = quizMock.request.mock.calls[0][0];
     expect(args.method).toBe("GET");
-    expect(args.url).toBe("/api/v1/loja/meu-historico-usos?page=1&usuarioId=u2");
+    expect(args.url).toBe("/api/v1/loja/meu-historico?page=1&usuarioId=u2");
     expect(args.headers.authorization).toMatch(/^Bearer /);
     expect(args.headers["x-user-id"]).toBe("u1");
     expect(args.headers["x-internal-token"]).toBeDefined();
