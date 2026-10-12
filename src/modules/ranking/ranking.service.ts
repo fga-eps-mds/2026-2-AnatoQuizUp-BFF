@@ -57,13 +57,14 @@ function calcularTaxa(acertos: number, respondidas: number): number {
 }
 
 /**
- * Comparador que implementa a regra de ordenacao definida na US do ranking.
+ * Comparador que implementa a regra de ordenacao do ranking de alunos.
  *
  * Os criterios sao aplicados em cascata, parando no primeiro que diferenciar:
- * 1. mais acertos primeiro;
- * 2. em caso de empate, quem respondeu menos (foi mais eficiente);
- * 3. persistindo o empate, quem pontuou primeiro (atividade mais antiga);
- * 4. por fim, ordem alfabetica pelo nome.
+ * 1. mais XP acumulado primeiro (US de progressao por XP);
+ * 2. em caso de empate, mais acertos;
+ * 3. depois, quem respondeu menos (foi mais eficiente);
+ * 4. persistindo o empate, quem pontuou primeiro (atividade mais antiga);
+ * 5. por fim, ordem alfabetica pelo nome.
  *
  * Quem nunca teve atividade recebe +Infinito no tempo, indo para o fim do criterio 3.
  *
@@ -72,21 +73,25 @@ function calcularTaxa(acertos: number, respondidas: number): number {
  * @returns Negativo se "a" vem antes, positivo se vem depois, 0 se equivalentes.
  */
 function compararEntradas(a: EntradaInterna, b: EntradaInterna): number {
-  // Criterio 1: mais acertos primeiro.
+  // Criterio 1: mais XP acumulado primeiro.
+  if (b.xpTotal !== a.xpTotal) {
+    return b.xpTotal - a.xpTotal;
+  }
+  // Criterio 2: entre iguais em XP, mais acertos primeiro.
   if (b.totalAcertos !== a.totalAcertos) {
     return b.totalAcertos - a.totalAcertos;
   }
-  // Criterio 2: entre iguais em acertos, quem respondeu menos foi mais eficiente.
+  // Criterio 3: entre iguais em acertos, quem respondeu menos foi mais eficiente.
   if (a.totalRespondidas !== b.totalRespondidas) {
     return a.totalRespondidas - b.totalRespondidas;
   }
-  // Criterio 3: desempata por quem teve atividade mais antiga (pontuou primeiro).
+  // Criterio 4: desempata por quem teve atividade mais antiga (pontuou primeiro).
   const tempoA = a.ultimaAtividade ? Date.parse(a.ultimaAtividade) : Number.POSITIVE_INFINITY;
   const tempoB = b.ultimaAtividade ? Date.parse(b.ultimaAtividade) : Number.POSITIVE_INFINITY;
   if (tempoA !== tempoB) {
     return tempoA - tempoB;
   }
-  // Criterio 4: ultimo desempate estavel, por ordem alfabetica.
+  // Criterio 5: ultimo desempate estavel, por ordem alfabetica.
   return a.nome.localeCompare(b.nome);
 }
 
@@ -107,6 +112,8 @@ function ordenarEAtribuirPosicoes(internas: EntradaInterna[]): EntradaRanking[] 
     nickname: entrada.nickname,
     curso: entrada.curso,
     semestre: entrada.semestre,
+    xpTotal: entrada.xpTotal,
+    nivel: entrada.nivel,
     totalAcertos: entrada.totalAcertos,
     totalRespondidas: entrada.totalRespondidas,
     taxaAcerto: entrada.taxaAcerto,
@@ -254,6 +261,9 @@ export class RankingService {
       nickname: base.nickname,
       curso: base.curso,
       semestre: base.semestre,
+      // Sem XP (nunca concluiu uma rodada de quiz) o aluno fica no nivel 1 com 0 XP.
+      xpTotal: pontuacao?.xpTotal ?? 0,
+      nivel: pontuacao?.nivel ?? 1,
       totalAcertos,
       totalRespondidas,
       taxaAcerto: calcularTaxa(totalAcertos, totalRespondidas),
