@@ -65,6 +65,11 @@ const envSchema = z.object({
     ),
   // Timeout das chamadas aos servicos internos (ms).
   REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
+  // Protecao da API: limite por IP e janela em milissegundos.
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(1200),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().max(86400000).default(60000),
+  // Habilitar apenas quando a quantidade de proxies da hospedagem for conhecida.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

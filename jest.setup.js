@@ -5,5 +5,6 @@ process.env.BACKEND_URL ||= "http://localhost:3333";
 process.env.AI_URL ||= "";
 process.env.INTERNAL_TOKEN ||= "test-internal-token";
 process.env.JWT_SECRET_KEY ||= "test-secret";
-process.env.CORS_ORIGINS ||= "http://localhost:5173";
+// A suíte usa uma origem fixa, independente do ambiente que executa o Jest.
+process.env.CORS_ORIGINS = "http://localhost:5173";
 process.env.REQUEST_TIMEOUT_MS ||= "15000";
