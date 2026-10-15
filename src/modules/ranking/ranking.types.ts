@@ -75,9 +75,13 @@ export type UsuarioPublico = {
 
 // ---- Dados vindos do Quiz-Service ----
 
-// Pontuacao agregada por usuario; ultimaAtividade serve de criterio de desempate.
+// Pontuacao agregada por usuario. xpTotal e o criterio principal do ranking de
+// alunos; acertos, respondidas e ultimaAtividade servem de desempate. xpTotal e
+// nivel sao opcionais para tolerar um Quiz-Service ainda sem a progressao por XP.
 export type PontuacaoUsuario = {
   usuarioId: string;
+  xpTotal?: number;
+  nivel?: number;
   totalAcertos: number;
   totalRespondidas: number;
   ultimaAtividade: string | null;
@@ -122,6 +126,8 @@ export type EntradaRanking = {
   nickname: string | null;
   curso: string | null;
   semestre: string | null;
+  xpTotal: number;
+  nivel: number;
   totalAcertos: number;
   totalRespondidas: number;
   taxaAcerto: number;
