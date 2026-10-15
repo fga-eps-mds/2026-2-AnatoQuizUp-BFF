@@ -1,52 +1,103 @@
-name: Export de métricas
+name: Export de metricas
 
 on:
   workflow_dispatch:
   pull_request:
-    branches:
-      - main
-      - develop
-    types: [ closed ]
+    branches: [main, develop]
+    types: [closed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: publicar-metricas-bff
+  cancel-in-progress: false
 
 jobs:
-  release:
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'NOT RELEASE') == false)
-    runs-on: "ubuntu-latest"
+  metrics:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     environment: actions
-    
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      SONAR_BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
+      REPO: ${{ github.event.repository.name }}
+      REPO_DOC: 2026-2-AnatoQuizUp-Doc
+      RELEASE_MAJOR: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'MAJOR RELEASE') }}
+      RELEASE_MINOR: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'MINOR RELEASE') }}
+      RELEASE_FIX: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'FIX RELEASE') }}
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout do commit integrado
+        uses: actions/checkout@v4
         with:
+          ref: ${{ env.EXPECTED_SHA }}
           fetch-depth: 0
-          
-      - name: Install dotenv
-        run: pip install python-dotenv packaging pandas
-          
-      - name: Cria arquivo .env
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Instalar dependências do parser
+        run: pip install requests python-dotenv packaging
+
+      - name: Validar configuração
+        env:
+          DOC_PUSH_TOKEN: ${{ secrets.DOC_PUSH_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          touch ./sonar_scripts/.env
-          echo GITHUB_TOKEN=${{ secrets.DOC_PUSH_TOKEN }} >> ./sonar_scripts/.env
-          echo RELEASE_MAJOR=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'MAJOR RELEASE') }} >> ./sonar_scripts/.env
-          echo RELEASE_MINOR=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'MINOR RELEASE') }} >> ./sonar_scripts/.env
-          echo RELEASE_FIX=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'FIX RELEASE') }} >> ./sonar_scripts/.env
-          echo DEVELOP=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'DEVELOP') }} >> ./sonar_scripts/.env
-          echo REPO=${{ github.event.repository.name }} >> ./sonar_scripts/.env
-          echo REPO_DOC=2026-2-AnatoQuizUp-Doc >> ./sonar_scripts/.env
+          test -n "$DOC_PUSH_TOKEN" || { echo '::error::Configure DOC_PUSH_TOKEN no environment actions.'; exit 1; }
+          test -n "$SONAR_TOKEN" || { echo '::error::Configure SONAR_TOKEN no environment actions.'; exit 1; }
+          [[ "$SONAR_BRANCH" == main || "$SONAR_BRANCH" == develop ]] || { echo '::error::Selecione main ou develop.'; exit 1; }
 
-      - name: Criar diretório
-        run: mkdir -p analytics-raw-data
-
-      - name: Coletar métricas no SonarCloud
-        run: python ./sonar_scripts/parser.py
-
-      - name: Envia métricas para repo de Doc
+      - name: Aguardar CI do commit integrado
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.email "${{secrets.USER_EMAIL}}"
-          git config --global user.name "${{secrets.USER_NAME}}"
-          git clone --single-branch --branch main "https://x-access-token:${{secrets.DOC_PUSH_TOKEN}}@github.com/fga-eps-mds/2026-2-AnatoQuizUp-Doc.git" doc
+          for attempt in $(seq 1 60); do
+            RUNS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=push&head_sha=$EXPECTED_SHA&branch=$SONAR_BRANCH&per_page=10")
+            STATUS=$(jq -r '.workflow_runs[0].status // "waiting"' <<< "$RUNS")
+            RESULT=$(jq -r '.workflow_runs[0].conclusion // ""' <<< "$RUNS")
+            if [[ "$STATUS" == completed ]]; then
+              [[ "$RESULT" == success ]] || { echo "::error::CI do commit integrado terminou com $RESULT."; exit 1; }
+              exit 0
+            fi
+            echo "Aguardando CI de $EXPECTED_SHA: $STATUS"
+            sleep 15
+          done
+          echo '::error::CI não concluiu no prazo. Nenhuma release será criada.'
+          exit 1
+
+      - name: Coletar e validar métricas; criar release quando rotulada
+        env:
+          GITHUB_TOKEN: ${{ secrets.DOC_PUSH_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: python sonar_scripts/parser.py
+
+      - name: Preservar métricas coletadas
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: metricas-${{ env.EXPECTED_SHA }}
+          path: analytics-raw-data/*.json
+          if-no-files-found: warn
+
+      - name: Enviar histórico para o repositório de documentação
+        env:
+          GH_TOKEN: ${{ secrets.DOC_PUSH_TOKEN }}
+        run: |
+          gh auth setup-git
+          git clone --single-branch --branch main "https://github.com/fga-eps-mds/$REPO_DOC.git" doc
           mkdir -p doc/analytics-raw-data/BFF
-          cp -R analytics-raw-data/*.json doc/analytics-raw-data/BFF
+          cp analytics-raw-data/*.json doc/analytics-raw-data/BFF/
           cd doc
-          git add .
-          git commit -m "Adicionando métricas do repositório ${{ github.event.repository.name }} ${{ github.ref_name }}" || echo "Sem alterações para commitar"
-          git push
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add analytics-raw-data/BFF/
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore(metrics): BFF $EXPECTED_SHA"
+          git pull --rebase origin main
+          git push origin HEAD:main
