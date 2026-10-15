@@ -14,6 +14,17 @@ module.exports = {
     "!src/server.ts",
     "!src/**/*.d.ts",
   ],
+  reporters: [
+    "default",
+    [
+      "@casualbot/jest-sonar-reporter",
+      {
+        outputDirectory: ".",
+        outputName: "sonar-report.xml",
+        relativePaths: true,
+      },
+    ],
+  ],
   coverageReporters: ["text", "lcov", "json-summary"],
   coverageThreshold: {
     global: {

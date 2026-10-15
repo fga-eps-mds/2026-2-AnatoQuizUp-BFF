@@ -28,43 +28,104 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: ".nvmrc"
-          cache: "npm"
+          node-version-file: '.nvmrc'
+          cache: 'npm'
 
-      - name: Instalar dependencias
+      - name: Instalar dependências
         run: npm ci
 
       - name: Rodar ESLint
         run: npm run lint
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validar coleta de métricas sem acessar serviços
+        run: |
+          pip install requests python-dotenv packaging
+          python -m unittest discover -s sonar_scripts -p 'test_*.py' -v
+
       - name: Build do projeto
         run: npm run build
 
-      - name: Rodar testes com cobertura
-        run: npm test -- --coverage --passWithNoTests
+      - name: Rodar testes com cobertura e relatório Sonar
+        id: jest
+        run: npm run test:ci
+        continue-on-error: true
 
-      - name: Verificar cobertura minima (85%)
+      - name: Validar relatórios dos testes
+        id: reports
+        if: ${{ always() && steps.jest.outcome != 'skipped' }}
         run: |
-          if [ ! -f coverage/coverage-summary.json ]; then
-            echo "::warning::coverage-summary.json nao encontrado."
-            exit 0
-          fi
-          COVERAGE=$(node -p "Math.round(require('./coverage/coverage-summary.json').total.lines.pct)")
-          echo "Cobertura de linhas: $COVERAGE%"
-          if [ "$COVERAGE" -lt 85 ]; then
-            echo "::error::Cobertura ($COVERAGE%) abaixo do minimo de 85%."
+          test -s coverage/lcov.info || {
+            echo "::error::Relatório de cobertura LCOV ausente ou vazio."
+            exit 1
+          }
+
+          test -s coverage/coverage-summary.json || {
+            echo "::error::Resumo da cobertura ausente ou vazio."
+            exit 1
+          }
+
+          test -s sonar-report.xml || {
+            echo "::error::Relatório de execução dos testes ausente ou vazio."
+            exit 1
+          }
+
+      - name: Verificar cobertura mínima (85%)
+        if: ${{ steps.reports.outcome == 'success' }}
+        run: |
+          TOTAL_LINES=$(node -p "require('./coverage/coverage-summary.json').total.lines.total ?? 0")
+
+          if [ "$TOTAL_LINES" -le 0 ]; then
+            echo "::error::Nenhuma linha instrumentada no relatório de cobertura."
             exit 1
           fi
-          echo "::notice::Cobertura ok: $COVERAGE%"
+
+          COVERAGE=$(node -p "Number(require('./coverage/coverage-summary.json').total.lines.pct || 0)")
+
+          echo "Cobertura de linhas: $COVERAGE%"
+
+          if ! node -e "process.exit(Number(process.argv[1]) < 85 ? 1 : 0)" "$COVERAGE"; then
+            echo "::error::Cobertura abaixo do mínimo de 85%."
+            exit 1
+          fi
+
+          echo "::notice::Cobertura acima do mínimo de 85%."
 
       - name: SonarCloud Scan
+        id: sonar-scan
+        if: ${{ always() && steps.reports.outcome == 'success' }}
         uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Aguardar SonarCloud Quality Gate
+        id: quality-gate
+        if: ${{ always() && steps.sonar-scan.outcome == 'success' }}
         uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Reprovar CI se os testes falharam
+        if: ${{ always() && steps.jest.outcome == 'failure' }}
+        run: |
+          echo "::error::A suíte Jest apresentou falhas ou timeouts."
+          exit 1
+
+      - name: Preservar evidências dos testes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: testes-${{ github.sha }}
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
+            sonar-report.xml
+            .scannerwork/report-task.txt
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
