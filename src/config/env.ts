@@ -44,12 +44,10 @@ const envSchema = z.object({
   // Enderecos dos servicos internos para onde o BFF faz proxy.
   BACKEND_URL: obrigatoriaComDefaultDeTeste("BACKEND_URL", "http://localhost:3333"),
   QUIZ_SERVICE_URL: obrigatoriaComDefaultDeTeste("QUIZ_SERVICE_URL", "http://localhost:3334"),
-  // IA ainda nao habilitada: aceita URL valida ou string vazia (desligada nesta release).
-  AI_URL: z
-    .string()
-    .url()
-    .or(z.literal(""))
-    .default(""),
+  // Chave da Gemini API; vazia desliga as rotas de IA generativa (perguntas livres).
+  GEMINI_API_KEY: z.string().default(""),
+  // Modelo da Gemini usado para responder perguntas livres do chat de ajuda.
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash"),
   // Segredos compartilhados: precisam bater com os dos servicos, senao da 401/403.
   INTERNAL_TOKEN: obrigatoriaComDefaultDeTeste("INTERNAL_TOKEN", "test-internal-token"),
   JWT_SECRET_KEY: obrigatoriaComDefaultDeTeste("JWT_SECRET_KEY", "test-secret"),

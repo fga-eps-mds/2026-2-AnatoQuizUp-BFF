@@ -6,7 +6,8 @@ describe("config/env", () => {
     expect(typeof env.PORT).toBe("number");
     expect(env.PORT).toBeGreaterThan(0);
     expect(env.BACKEND_URL).toMatch(/^https?:\/\//);
-    expect(env.AI_URL === "" || /^https?:\/\//.test(env.AI_URL)).toBe(true);
+    expect(typeof env.GEMINI_API_KEY).toBe("string");
+    expect(env.GEMINI_MODEL).toBeTruthy();
     expect(Array.isArray(env.CORS_ORIGINS)).toBe(true);
     expect(typeof env.REQUEST_TIMEOUT_MS).toBe("number");
     expect(env.REQUEST_TIMEOUT_MS).toBeGreaterThan(0);
