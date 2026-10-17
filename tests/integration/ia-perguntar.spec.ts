@@ -36,7 +36,12 @@ describe("POST /api/v1/ia/perguntar - Gemini habilitada", () => {
     const resposta = await request(aplicacao)
       .post("/api/v1/ia/perguntar")
       .set("Authorization", `Bearer ${tokenValido()}`)
-      .send({ pergunta: "Por que o femur e tao grande?", tema: "Sistema Esquelético" });
+      .send({
+        pergunta: "Por que o femur e tao grande?",
+        tema: "Sistema Esquelético",
+        dificuldade: "Fácil",
+        enunciado: "Qual e o osso mais longo do corpo humano?",
+      });
 
     expect(resposta.status).toBe(200);
     expect(resposta.body).toEqual({ resposta: "O femur e o osso mais longo." });
@@ -62,5 +67,15 @@ describe("POST /api/v1/ia/perguntar - Gemini habilitada", () => {
 
     expect(resposta.status).toBe(502);
     expect(resposta.body.erro.codigo).toBe("ERRO_DOWNSTREAM");
+  });
+
+  it("retorna 404 padrao para rota desconhecida sob /ia quando a Gemini esta configurada", async () => {
+    const resposta = await request(aplicacao)
+      .get("/api/v1/ia/rota-inexistente")
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(404);
+    expect(resposta.body.erro.codigo).toBe("NAO_ENCONTRADO");
+    expect(geminiMock.post).not.toHaveBeenCalled();
   });
 });
