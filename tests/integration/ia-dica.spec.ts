@@ -44,6 +44,39 @@ describe("GET /api/v1/ia/dica", () => {
     expect(resposta.body.erro.codigo).toBe("HISTORICO_INSUFICIENTE");
   });
 
+  it("retorna 401 quando o token nao traz identificador do usuario", async () => {
+    const tokenSemSub = jwt.sign({ papel: "ALUNO", status: "ATIVO" }, SEGREDO, {
+      expiresIn: "5m",
+    });
+
+    const resposta = await request(aplicacao)
+      .get("/api/v1/ia/dica")
+      .set("Authorization", `Bearer ${tokenSemSub}`);
+
+    expect(resposta.status).toBe(401);
+    expect(quizMock.get).not.toHaveBeenCalled();
+  });
+
+  it("escolhe o tema de pior desempenho entre varios temas fora de Tranquilo", async () => {
+    quizMock.get.mockResolvedValue({
+      data: {
+        totalRespondidas: 20,
+        porTema: [
+          { nome: "Torax", taxaAcerto: 90, status: "Tranquilo" },
+          { nome: "Cranio", taxaAcerto: 60, status: "Atenção" },
+          { nome: "Abdomen", taxaAcerto: 30, status: "Crítico" },
+        ],
+      },
+    });
+
+    const resposta = await request(aplicacao)
+      .get("/api/v1/ia/dica")
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.dica).toContain("Abdomen");
+  });
+
   it("retorna a dica com base no tema de pior desempenho do aluno", async () => {
     quizMock.get.mockResolvedValue({
       data: {
