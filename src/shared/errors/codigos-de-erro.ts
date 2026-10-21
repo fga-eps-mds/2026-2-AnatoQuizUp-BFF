@@ -9,7 +9,6 @@ export const CodigoDeErro = {
   ERRO_DOWNSTREAM: "ERRO_DOWNSTREAM",
   TIMEOUT_DOWNSTREAM: "TIMEOUT_DOWNSTREAM",
   IA_INDISPONIVEL: "IA_INDISPONIVEL",
-  HISTORICO_INSUFICIENTE: "HISTORICO_INSUFICIENTE",
 } as const;
 
 // Tipo derivado: aceita exatamente um dos valores acima, evitando strings soltas.

@@ -8,6 +8,5 @@ export const MENSAGENS = {
   tokenAcessoAusente: "Token de acesso ausente.",
   tokenAcessoInvalido: "Token de acesso invalido ou expirado.",
   iaIndisponivel: "Servico de IA ainda nao foi habilitado nesta release.",
-  alunoSemHistorico: "Aluno ainda nao tem historico suficiente para gerar uma dica.",
   falhaServicoDownstream: "Falha ao consultar o servico downstream.",
 } as const;
