@@ -82,6 +82,7 @@ export type PontuacaoUsuario = {
   usuarioId: string;
   xpTotal?: number;
   nivel?: number;
+  elo?: string;
   totalAcertos: number;
   totalRespondidas: number;
   ultimaAtividade: string | null;
@@ -128,6 +129,7 @@ export type EntradaRanking = {
   semestre: string | null;
   xpTotal: number;
   nivel: number;
+  elo: string;
   totalAcertos: number;
   totalRespondidas: number;
   taxaAcerto: number;
