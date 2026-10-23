@@ -55,6 +55,7 @@ apiRouter.use("/inventario/usuarios/equipados", middlewareAutenticacao, bloquear
 apiRouter.use("/inventario", middlewareAutenticacao, criarProxyHandler(quizClient));
 apiRouter.use("/conquistas/usuarios/destaques", middlewareAutenticacao, bloquearRotaInterna);
 apiRouter.use("/conquistas", middlewareAutenticacao, criarProxyHandler(quizClient));
+apiRouter.use("/missoes", middlewareAutenticacao, criarProxyHandler(quizClient));
 apiRouter.use("/perfis", perfilSocialRouter);
 apiRouter.use("/amizade", amizadeRouter);
 apiRouter.use("/ranking", rankingRouter);

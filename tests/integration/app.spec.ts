@@ -400,3 +400,21 @@ describe("erro do downstream", () => {
     expect(resposta.status).toBe(502);
   });
 });
+
+describe("/api/v1/missoes - proxy autenticado", () => {
+  it("nega requisição sem token", async () => {
+    const resposta = await request(aplicacao).get("/api/v1/missoes/minhas");
+    expect(resposta.status).toBe(401);
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it("encaminha a identidade do JWT mesmo com cabeçalhos forjados", async () => {
+    quizMock.request.mockResolvedValue({ status: 200, data: { missoes: [] }, headers: {} });
+    const resposta = await request(aplicacao).get("/api/v1/missoes/minhas?usuarioId=u2")
+      .set("Authorization", `Bearer ${tokenValido()}`).set("x-user-id", "u2");
+    expect(resposta.status).toBe(200);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "GET", url: "/api/v1/missoes/minhas?usuarioId=u2", headers: { "x-user-id": "u1", "x-user-papel": "ALUNO" },
+    });
+  });
+});
