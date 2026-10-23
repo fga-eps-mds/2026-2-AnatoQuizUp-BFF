@@ -31,13 +31,13 @@ jobs:
 
     steps:
       - name: Checkout do commit integrado
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ env.EXPECTED_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.13'
 
@@ -79,7 +79,7 @@ jobs:
 
       - name: Preservar métricas coletadas
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: metricas-${{ env.EXPECTED_SHA }}
           path: analytics-raw-data/*.json
