@@ -30,7 +30,7 @@ beforeEach(() => {
 describe("RankingService.rankingGeral", () => {
   const service = new RankingService();
 
-  test("ordena por XP antes dos acertos e devolve XP e nivel de cada aluno", async () => {
+  test("ordena por XP antes dos acertos e devolve XP, nivel e elo de cada aluno", async () => {
     backendGet.mockResolvedValue({
       data: {
         dados: [
@@ -46,8 +46,8 @@ describe("RankingService.rankingGeral", () => {
           data: {
             dados: [
               // Mais acertos, porem menos XP: fica atras de quem tem mais XP.
-              { usuarioId: "u2", xpTotal: 90, nivel: 1, totalAcertos: 50, totalRespondidas: 60, ultimaAtividade: null },
-              { usuarioId: "u1", xpTotal: 320, nivel: 3, totalAcertos: 10, totalRespondidas: 20, ultimaAtividade: null },
+              { usuarioId: "u2", xpTotal: 90, nivel: 1, elo: "Curioso", totalAcertos: 50, totalRespondidas: 60, ultimaAtividade: null },
+              { usuarioId: "u1", xpTotal: 1520, nivel: 6, elo: "Interno", totalAcertos: 10, totalRespondidas: 20, ultimaAtividade: null },
             ],
           },
         });
@@ -58,11 +58,11 @@ describe("RankingService.rankingGeral", () => {
     const resultado = await service.rankingGeral(usuarioAluno, auth);
 
     expect(resultado.dados.map((entrada) => entrada.usuarioId)).toEqual(["u1", "u2", "u3"]);
-    expect(resultado.dados[0]).toMatchObject({ posicao: 1, xpTotal: 320, nivel: 3 });
-    expect(resultado.dados[1]).toMatchObject({ posicao: 2, xpTotal: 90, nivel: 1 });
-    // Quem nunca pontuou aparece com 0 XP no nivel 1.
-    expect(resultado.dados[2]).toMatchObject({ posicao: 3, xpTotal: 0, nivel: 1 });
-    expect(resultado.usuarioAtual).toMatchObject({ usuarioId: "u1", posicao: 1, xpTotal: 320 });
+    expect(resultado.dados[0]).toMatchObject({ posicao: 1, xpTotal: 1520, nivel: 6, elo: "Interno" });
+    expect(resultado.dados[1]).toMatchObject({ posicao: 2, xpTotal: 90, nivel: 1, elo: "Curioso" });
+    // Quem nunca pontuou aparece com 0 XP no nivel 1 e elo Curioso.
+    expect(resultado.dados[2]).toMatchObject({ posicao: 3, xpTotal: 0, nivel: 1, elo: "Curioso" });
+    expect(resultado.usuarioAtual).toMatchObject({ usuarioId: "u1", posicao: 1, xpTotal: 1520, elo: "Interno" });
   });
 
   test("ordena por acertos, destaca o usuario atual e anexa cosmeticos", async () => {
