@@ -114,6 +114,7 @@ function ordenarEAtribuirPosicoes(internas: EntradaInterna[]): EntradaRanking[] 
     semestre: entrada.semestre,
     xpTotal: entrada.xpTotal,
     nivel: entrada.nivel,
+    elo: entrada.elo,
     totalAcertos: entrada.totalAcertos,
     totalRespondidas: entrada.totalRespondidas,
     taxaAcerto: entrada.taxaAcerto,
@@ -261,9 +262,10 @@ export class RankingService {
       nickname: base.nickname,
       curso: base.curso,
       semestre: base.semestre,
-      // Sem XP (nunca concluiu uma rodada de quiz) o aluno fica no nivel 1 com 0 XP.
+      // Sem XP (nunca concluiu uma rodada de quiz) o aluno fica no nivel 1, elo Curioso, com 0 XP.
       xpTotal: pontuacao?.xpTotal ?? 0,
       nivel: pontuacao?.nivel ?? 1,
+      elo: pontuacao?.elo ?? "Curioso",
       totalAcertos,
       totalRespondidas,
       taxaAcerto: calcularTaxa(totalAcertos, totalRespondidas),
