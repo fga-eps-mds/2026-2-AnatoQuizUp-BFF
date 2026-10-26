@@ -109,6 +109,11 @@ make clean       # apaga dist/ e coverage/
 | `/api/v1/usuarios/*` | Backend/Auth `/api/v1/usuarios/*` (autenticado) |
 | `/api/v1/exemplos/*` | Backend/Auth `/api/v1/exemplos/*` (autenticado) |
 | `/api/v1/questoes/*` | Quiz-Service `/api/v1/questoes/*` (autenticado) |
+| `/api/v1/quiz/*` | Quiz-Service `/api/v1/quiz/*` (autenticado) — rodadas, XP, nível e elo |
+| `/api/v1/quiz/progressao/elo/historico` | Quiz-Service — rebaixamentos e recuperações do próprio aluno |
+| `/api/v1/quiz/progressao/notificacoes*` | Quiz-Service — avisos de inatividade/elo do próprio aluno |
+| `/api/v1/quiz/progressao/inatividade/verificar` | Quiz-Service — rotina de inatividade (**ADMINISTRADOR**) |
+| `/api/v1/quiz/progressao/configuracao` | Quiz-Service — prazos da regra de inatividade (**ADMINISTRADOR**) |
 | `/api/v1/turmas/*` | Quiz-Service `/api/v1/turmas/*` (autenticado) |
 | `/api/v1/ia/*` | AI `/api/v1/*` — atualmente **503 `IA_INDISPONIVEL`** enquanto `AI_URL` estiver vazio |
 

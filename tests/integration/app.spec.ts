@@ -376,6 +376,100 @@ describe("/api/v1/loja - identidade e contrato do proxy", () => {
   });
 });
 
+describe("/api/v1/quiz/progressao - inatividade e elo (US #89)", () => {
+  const tokenAdmin = () =>
+    jwt.sign({ sub: "admin-1", papel: "ADMINISTRADOR", status: "ATIVO" }, SEGREDO, {
+      expiresIn: "5m",
+    });
+
+  it("rejeita as rotas de elo sem JWT e nao chama o Quiz Service", async () => {
+    const semToken = await Promise.all([
+      request(aplicacao).get("/api/v1/quiz/progressao/notificacoes"),
+      request(aplicacao).get("/api/v1/quiz/progressao/elo/historico"),
+      request(aplicacao).post("/api/v1/quiz/progressao/inatividade/verificar"),
+      request(aplicacao).get("/api/v1/quiz/progressao/configuracao"),
+    ]);
+
+    expect(semToken.map((resposta) => resposta.status)).toEqual([401, 401, 401, 401]);
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it("repassa o progresso com os campos de inatividade sem alterar o payload", async () => {
+    const progresso = {
+      xpTotal: 7000,
+      xpElo: 5999,
+      eloAtual: { codigo: "R1", nome: "R1", ordem: 4 },
+      maiorElo: { codigo: "R3", nome: "R3", ordem: 5 },
+      estadoElo: "REBAIXADO",
+      diasInatividade: 9,
+      prazoRebaixamentoEm: "2026-11-09T00:00:00.000Z",
+    };
+    quizMock.request.mockResolvedValue({
+      status: 200,
+      data: progresso,
+      headers: { "content-type": "application/json" },
+    });
+
+    const resposta = await request(aplicacao)
+      .get("/api/v1/quiz/progresso")
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toEqual(progresso);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "GET",
+      url: "/api/v1/quiz/progresso",
+    });
+  });
+
+  it("substitui identidade forjada: o aluno nao consegue ler avisos de outro", async () => {
+    quizMock.request.mockResolvedValue({ status: 200, data: [], headers: {} });
+
+    await request(aplicacao)
+      .get("/api/v1/quiz/progressao/notificacoes?apenasNaoLidas=true")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .set("X-User-Id", "u2")
+      .set("X-Internal-Token", "forjado");
+
+    const args = quizMock.request.mock.calls[0][0];
+    expect(args.url).toBe("/api/v1/quiz/progressao/notificacoes?apenasNaoLidas=true");
+    expect(args.headers["x-user-id"]).toBe("u1");
+    expect(args.headers["x-internal-token"]).not.toBe("forjado");
+  });
+
+  it("encaminha a rotina e a configuracao com a identidade do administrador", async () => {
+    quizMock.request.mockResolvedValue({
+      status: 200,
+      data: { avaliados: 2, rebaixamentos: 1, notificacoes: 3 },
+      headers: {},
+    });
+
+    const rotina = await request(aplicacao)
+      .post("/api/v1/quiz/progressao/inatividade/verificar")
+      .set("Authorization", `Bearer ${tokenAdmin()}`);
+
+    expect(rotina.status).toBe(200);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "POST",
+      url: "/api/v1/quiz/progressao/inatividade/verificar",
+    });
+    expect(quizMock.request.mock.calls[0][0].headers["x-user-papel"]).toBe("ADMINISTRADOR");
+  });
+
+  it("preserva o 403 do Quiz Service quando o aluno tenta alterar os prazos", async () => {
+    const erro = { erro: { codigo: "NAO_AUTORIZADO", mensagem: "Acesso não autorizado" } };
+    quizMock.request.mockResolvedValue({ status: 403, data: erro, headers: {} });
+
+    const resposta = await request(aplicacao)
+      .put("/api/v1/quiz/progressao/configuracao")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ diasAviso: 1, diasRisco: 2, diasRebaixamento: 3, diasEntreRebaixamentos: 4 });
+
+    expect(resposta.status).toBe(403);
+    expect(resposta.body).toEqual(erro);
+  });
+});
+
 describe("/api/v1/ia - placeholder", () => {
   it("retorna 503 IA_INDISPONIVEL", async () => {
     const resposta = await request(aplicacao)
