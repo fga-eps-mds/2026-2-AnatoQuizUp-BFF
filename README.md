@@ -205,6 +205,7 @@ Qualquer outro path de autenticação exige `Authorization: Bearer <accessToken>
 
 ## Documentação
 
+- [Publicação do BFF em homologação](docs/deploy-homologacao.md)
 - [Doc geral do projeto](https://fga-eps-mds.github.io/2026-1-AnatoQuizUp-Doc/)
 - [Guia de arquitetura para devs](https://github.com/fga-eps-mds/2026-1-AnatoQuizUp-Doc/blob/main/docs/arquitetura/guia-arquitetura-bff.md)
 - [PRD da migração para BFF](https://github.com/fga-eps-mds/2026-1-AnatoQuizUp-Doc/blob/main/docs/arquitetura/prd-migracao-bff.md)
