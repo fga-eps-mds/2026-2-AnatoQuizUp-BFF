@@ -1,0 +1,20 @@
+services:
+  bff:
+    build: .
+    container_name: anatoquizup-bff
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # Dentro do container, "localhost" e o proprio BFF: os servicos rodando no
+      # host (Usuario 3333 / Quiz 3334) sao acessados por host.docker.internal.
+      # Libera o Web em Docker (8080) alem do dev server (5173).
+      CORS_ORIGINS: ${DOCKER_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}
+      BACKEND_URL: ${DOCKER_BACKEND_URL:-http://host.docker.internal:3333}
+      QUIZ_SERVICE_URL: ${DOCKER_QUIZ_SERVICE_URL:-http://host.docker.internal:3334}
+    ports:
+      - "${PORT:-4000}:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
