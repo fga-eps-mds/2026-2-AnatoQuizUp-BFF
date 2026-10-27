@@ -14,7 +14,6 @@
 // analogo, para um candidato so, do R² que o AMEE 49 usa para auditar a estacao.
 // Ver docs/arquitetura/chatbot-osce.md (secao 5) para as referencias completas.
 import {
-  NOTA_GLOBAL_APROVACAO,
   NOTAS_GLOBAIS,
   type CenarioOsce,
   type ItemRubrica,
@@ -23,12 +22,19 @@ import {
 
 // Faixas do checklist, da maior para a menor. O `equivalenteGlobal` alinha cada faixa
 // a um ponto da escala global (0-4), que e o que torna as duas medidas comparaveis.
+const FAIXA_INSUFICIENTE = {
+  minimo: 0,
+  nivel: "insuficiente",
+  rotulo: "Insuficiente",
+  equivalenteGlobal: 0,
+} as const;
+
 const FAIXAS = [
   { minimo: 90, nivel: "excelente", rotulo: "Excelente", equivalenteGlobal: 4 },
   { minimo: 75, nivel: "bom", rotulo: "Bom", equivalenteGlobal: 3 },
   { minimo: 60, nivel: "suficiente", rotulo: "Suficiente", equivalenteGlobal: 2 },
   { minimo: 50, nivel: "limitrofe", rotulo: "Limítrofe", equivalenteGlobal: 1 },
-  { minimo: 0, nivel: "insuficiente", rotulo: "Insuficiente", equivalenteGlobal: 0 },
+  FAIXA_INSUFICIENTE,
 ] as const;
 
 export type NivelChecklist = (typeof FAIXAS)[number]["nivel"];
@@ -140,8 +146,10 @@ export function pontuarRubrica(
     .filter((item) => item.critico && item.nivel !== "competente")
     .map((item) => item.descricao);
 
+  // A ultima faixa comeca em 0, entao o find sempre acha; o fallback existe so para
+  // o tipo nao sair opcional daqui.
   const faixaPorPercentual =
-    FAIXAS.find((faixa) => percentual >= faixa.minimo) ?? FAIXAS[FAIXAS.length - 1];
+    FAIXAS.find((faixa) => percentual >= faixa.minimo) ?? FAIXA_INSUFICIENTE;
   const indiceTeto = FAIXAS.findIndex((faixa) => faixa.nivel === TETO_CRITICO);
 
   // Item critico falhado rebaixa ao teto, mas nunca eleva uma nota ja pior que ele.
@@ -176,5 +184,3 @@ export function pontuarRubrica(
     divergente: Math.abs(faixa.equivalenteGlobal - notaGlobal) >= DIVERGENCIA_MAXIMA,
   };
 }
-
-export { NOTA_GLOBAL_APROVACAO };
