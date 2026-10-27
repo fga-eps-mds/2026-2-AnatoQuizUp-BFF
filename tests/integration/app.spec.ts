@@ -9,8 +9,8 @@ jest.mock("@/shared/clients/quiz.client", () => ({
   quizClient: { request: jest.fn() },
 }));
 
-jest.mock("@/shared/clients/ai.client", () => ({
-  aiClient: null,
+jest.mock("@/shared/clients/gemini.client", () => ({
+  geminiClient: null,
 }));
 
 import { aplicacao } from "@/config/app";
@@ -477,6 +477,24 @@ describe("/api/v1/ia - placeholder", () => {
       .set("Authorization", `Bearer ${tokenValido()}`);
     expect(resposta.status).toBe(503);
     expect(resposta.body.erro.codigo).toBe("IA_INDISPONIVEL");
+  });
+
+  it("POST /ia/perguntar retorna 503 IA_INDISPONIVEL sem GEMINI_API_KEY configurada", async () => {
+    const resposta = await request(aplicacao)
+      .post("/api/v1/ia/perguntar")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ pergunta: "Por que o femur e o maior osso?" });
+    expect(resposta.status).toBe(503);
+    expect(resposta.body.erro.codigo).toBe("IA_INDISPONIVEL");
+  });
+
+  it("POST /ia/perguntar retorna 400 para pergunta vazia", async () => {
+    const resposta = await request(aplicacao)
+      .post("/api/v1/ia/perguntar")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ pergunta: "" });
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.erro.codigo).toBe("REQUISICAO_INVALIDA");
   });
 });
 

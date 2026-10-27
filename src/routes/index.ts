@@ -4,6 +4,7 @@ import { adminRouter } from "@/routes/admin.routes";
 import { authRouter } from "@/routes/auth.routes";
 import { exemplosRouter } from "@/routes/exemplos.routes";
 import { iaRouter } from "@/routes/ia.routes";
+import { osceRouter } from "@/routes/osce.routes";
 import { questoesRouter } from "@/routes/questoes.routes";
 import { turmasRouter } from "@/routes/turmas.routes";
 import { usuariosRouter } from "@/routes/usuarios.routes";
@@ -44,6 +45,9 @@ apiRouter.use("/autenticacao", authRouter);
 apiRouter.use("/admin", adminRouter);
 apiRouter.use("/exemplos", exemplosRouter);
 apiRouter.use("/questoes", questoesRouter);
+// Precisa vir antes de "/ia": o catch-all de iaRouter intercepta qualquer sub-rota
+// nao mapeada em /ia/*, inclusive /ia/osce/*, se montado primeiro.
+apiRouter.use("/ia/osce", osceRouter);
 apiRouter.use("/ia", iaRouter);
 apiRouter.use("/turmas", turmasRouter);
 apiRouter.use("/usuarios", usuariosRouter);

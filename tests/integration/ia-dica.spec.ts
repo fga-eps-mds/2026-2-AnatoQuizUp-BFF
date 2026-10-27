@@ -9,8 +9,8 @@ jest.mock("@/shared/clients/quiz.client", () => ({
   quizClient: { get: jest.fn() },
 }));
 
-jest.mock("@/shared/clients/ai.client", () => ({
-  aiClient: null,
+jest.mock("@/shared/clients/gemini.client", () => ({
+  geminiClient: null,
 }));
 
 import { aplicacao } from "@/config/app";
