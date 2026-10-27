@@ -35,9 +35,11 @@ type RespostaGerarConteudo = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 };
 
-// Thinking desligado: com ele a chamada levava 10-15s e as vezes estourava o
-// REQUEST_TIMEOUT_MS (ou voltava vazia, gastando o budget de saida pensando).
-const GERACAO_SEM_THINKING = { thinkingConfig: { thinkingBudget: 0 } };
+// Thinking no nivel minimo: com o nivel alto a chamada levava 10-15s e as vezes
+// estourava o REQUEST_TIMEOUT_MS (ou voltava vazia, gastando o budget de saida
+// pensando). O gemini-3.5-flash-lite nao aceita `thinkingBudget: 0` (devolve 400
+// INVALID_ARGUMENT); o minimo que ele expoe e `thinkingLevel: "low"`.
+const GERACAO_THINKING_MINIMO = { thinkingConfig: { thinkingLevel: "low" } };
 
 // A Gemini responde JSON por responseMimeType, mas um corpo malformado nao pode
 // derrubar a rota: devolve null e o safeParse acima transforma em 502.
@@ -224,7 +226,7 @@ router.post("/:id/mensagem", async (request: Request, response: Response, next: 
           ...historicoParaContents(corpo.data.historico),
           { role: "user", parts: [{ text: corpo.data.mensagem }] },
         ],
-        generationConfig: GERACAO_SEM_THINKING,
+        generationConfig: GERACAO_THINKING_MINIMO,
       },
     );
 
@@ -275,7 +277,7 @@ router.post("/:id/finalizar", async (request: Request, response: Response, next:
         system_instruction: { parts: [{ text: montarInstrucaoAvaliacao(cenario) }] },
         contents: [{ role: "user", parts: [{ text: transcricao || "(nenhuma pergunta feita)" }] }],
         generationConfig: {
-          ...GERACAO_SEM_THINKING,
+          ...GERACAO_THINKING_MINIMO,
           responseMimeType: "application/json",
           responseSchema: montarSchemaAvaliacao(cenario),
         },

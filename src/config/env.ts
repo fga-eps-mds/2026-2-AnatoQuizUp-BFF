@@ -47,7 +47,7 @@ const envSchema = z.object({
   // Chave da Gemini API; vazia desliga as rotas de IA generativa (perguntas livres).
   GEMINI_API_KEY: z.string().default(""),
   // Modelo da Gemini usado para responder perguntas livres do chat de ajuda.
-  GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash"),
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
   // Segredos compartilhados: precisam bater com os dos servicos, senao da 401/403.
   INTERNAL_TOKEN: obrigatoriaComDefaultDeTeste("INTERNAL_TOKEN", "test-internal-token"),
   JWT_SECRET_KEY: obrigatoriaComDefaultDeTeste("JWT_SECRET_KEY", "test-secret"),
