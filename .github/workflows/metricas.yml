@@ -2,6 +2,9 @@ name: Export de metricas
 
 on:
   workflow_dispatch:
+  # Coleta semanal no fechamento da sprint (domingo 23:17 em Brasília = segunda 02:17 UTC).
+  schedule:
+    - cron: '17 2 * * 1'
   pull_request:
     branches: [main, develop]
     types: [closed]
@@ -16,7 +19,7 @@ concurrency:
 
 jobs:
   metrics:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: actions
