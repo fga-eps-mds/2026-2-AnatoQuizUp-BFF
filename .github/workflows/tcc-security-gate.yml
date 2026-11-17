@@ -284,6 +284,7 @@ jobs:
                 PORT: "4000"
                 BACKEND_URL: http://usuario-service:3333
                 QUIZ_SERVICE_URL: http://quiz-service:3334
+                CHATBOT_OSCE_URL: http://chatbot-osce:3335
                 AI_URL: ""
                 JWT_SECRET_KEY: ${DAST_JWT_SECRET_KEY}
                 INTERNAL_TOKEN: ${DAST_INTERNAL_TOKEN}
