@@ -94,7 +94,9 @@ jobs:
       - name: npm audit (high+)
         id: npm-audit
         continue-on-error: true
-        run: npm audit --audit-level=high
+        # --omit=dev: devDependencies (jest/ts-jest/typescript-eslint) nunca chegam
+        # ao dist/server.js; nao falhar o gate por CVE que so afeta o toolchain de teste.
+        run: npm audit --omit=dev --audit-level=high
       - name: npm audit JSON
         if: always()
         run: npm audit --json > npm-audit-report.json || true
