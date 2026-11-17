@@ -47,8 +47,15 @@ apiRouter.use("/exemplos", exemplosRouter);
 apiRouter.use("/questoes", questoesRouter);
 // Precisa vir antes de "/ia": o catch-all de iaRouter intercepta qualquer sub-rota
 // nao mapeada em /ia/*, inclusive /ia/osce/*, se montado primeiro.
-// Simulacao OSCE mora no ChatbotOSCE (DA-07); o BFF so repassa a chamada.
-apiRouter.use("/ia/osce", middlewareAutenticacao, criarProxyHandler(chatbotOsceClient));
+// Simulacao OSCE mora no ChatbotOSCE (DA-07); o BFF so repassa a chamada. O
+// ChatbotOSCE monta as rotas em /osce (sem o prefixo /api/v1/ia que o BFF usa).
+apiRouter.use(
+  "/ia/osce",
+  middlewareAutenticacao,
+  criarProxyHandler(chatbotOsceClient, {
+    montarUrl: (request) => request.originalUrl.replace(/^\/api\/v1\/ia\/osce/, "/osce"),
+  }),
+);
 apiRouter.use("/ia", iaRouter);
 apiRouter.use("/turmas", turmasRouter);
 apiRouter.use("/usuarios", usuariosRouter);
