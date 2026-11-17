@@ -44,6 +44,7 @@ const envSchema = z.object({
   // Enderecos dos servicos internos para onde o BFF faz proxy.
   BACKEND_URL: obrigatoriaComDefaultDeTeste("BACKEND_URL", "http://localhost:3333"),
   QUIZ_SERVICE_URL: obrigatoriaComDefaultDeTeste("QUIZ_SERVICE_URL", "http://localhost:3334"),
+  CHATBOT_OSCE_URL: obrigatoriaComDefaultDeTeste("CHATBOT_OSCE_URL", "http://localhost:3335"),
   // Chave da Gemini API; vazia desliga as rotas de IA generativa (perguntas livres).
   GEMINI_API_KEY: z.string().default(""),
   // Modelo da Gemini usado para responder perguntas livres do chat de ajuda.

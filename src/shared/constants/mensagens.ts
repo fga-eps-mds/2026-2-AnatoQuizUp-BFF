@@ -12,8 +12,4 @@ export const MENSAGENS = {
   perguntaInvalida: "Pergunta invalida: informe um texto de 1 a 500 caracteres.",
   respostaIaIndisponivel: "Nao foi possivel obter uma resposta da IA agora. Tente novamente.",
   falhaServicoDownstream: "Falha ao consultar o servico downstream.",
-  cenarioOsceNaoEncontrado: "Cenario de simulacao OSCE nao encontrado.",
-  mensagemOsceInvalida: "Mensagem invalida: informe um texto de 1 a 500 caracteres.",
-  historicoOsceInvalido: "Historico invalido: cada item precisa de autor (aluno/paciente) e texto.",
-  avaliacaoOsceInvalida: "A IA nao devolveu uma avaliacao. Tente finalizar novamente.",
 } as const;
