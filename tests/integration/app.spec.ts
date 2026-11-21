@@ -558,3 +558,26 @@ describe("/api/v1/casos-osce - proxy autenticado (US26)", () => {
     });
   });
 });
+
+describe("rotas internas bloqueadas (uso exclusivo de ranking/perfil social)", () => {
+  it.each([
+    "/api/v1/inventario/usuarios/equipados",
+    "/api/v1/conquistas/usuarios/destaques",
+  ])("responde 404 para GET %s mesmo autenticado, sem acionar o proxy", async (caminho) => {
+    const resposta = await request(aplicacao)
+      .get(caminho)
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(404);
+    expect(resposta.body.erro.codigo).toBe("NAO_ENCONTRADO");
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "/api/v1/inventario/usuarios/equipados",
+    "/api/v1/conquistas/usuarios/destaques",
+  ])("exige token antes mesmo de bloquear GET %s", async (caminho) => {
+    const resposta = await request(aplicacao).get(caminho);
+    expect(resposta.status).toBe(401);
+  });
+});

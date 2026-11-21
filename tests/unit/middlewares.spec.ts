@@ -66,6 +66,19 @@ describe("middlewareAutenticacao", () => {
       status: "ATIVO",
     });
   });
+
+  it("usa 'id' e strings vazias quando o token nao traz sub/papel/status", () => {
+    const token = jwt.sign({ id: "user-456" }, SEGREDO, { expiresIn: "5m" });
+    const request = montarRequest({ authorization: `Bearer ${token}` });
+    const next: NextFunction = jest.fn();
+    middlewareAutenticacao(request, montarResponse(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect((request as Request).usuario).toEqual({
+      id: "user-456",
+      papel: "",
+      status: "",
+    });
+  });
 });
 
 describe("middlewareTratamentoErros", () => {
