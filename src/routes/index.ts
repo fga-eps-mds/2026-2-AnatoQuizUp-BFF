@@ -60,6 +60,8 @@ apiRouter.use("/ia", iaRouter);
 apiRouter.use("/turmas", turmasRouter);
 apiRouter.use("/usuarios", usuariosRouter);
 apiRouter.use("/quiz", middlewareAutenticacao, criarProxyHandler(quizClient));
+// Cadastro de casos OSCE (US26): proxy direto, o Quiz-Service restringe a PROFESSOR.
+apiRouter.use("/casos-osce", middlewareAutenticacao, criarProxyHandler(quizClient));
 apiRouter.use("/loja", middlewareAutenticacao, criarProxyHandler(quizClient));
 // As rotas ".../equipados" e ".../destaques" sao consumidas internamente (ranking e
 // perfil social); ficam bloqueadas para acesso publico direto, antes do proxy geral.

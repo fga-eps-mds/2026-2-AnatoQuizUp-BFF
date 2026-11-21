@@ -530,3 +530,31 @@ describe("/api/v1/missoes - proxy autenticado", () => {
     });
   });
 });
+
+describe("/api/v1/casos-osce - proxy autenticado (US26)", () => {
+  it("nega requisição sem token", async () => {
+    const resposta = await request(aplicacao).get("/api/v1/casos-osce");
+    expect(resposta.status).toBe(401);
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it("encaminha o metodo, a url e a identidade do JWT pro Quiz-Service", async () => {
+    quizMock.request.mockResolvedValue({
+      status: 201,
+      data: { mensagem: "Caso OSCE criado com sucesso.", dados: { id: "caso-1" } },
+      headers: {},
+    });
+
+    const resposta = await request(aplicacao)
+      .post("/api/v1/casos-osce")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ titulo: "Dor torácica" });
+
+    expect(resposta.status).toBe(201);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "POST",
+      url: "/api/v1/casos-osce",
+      headers: { "x-user-id": "u1" },
+    });
+  });
+});
