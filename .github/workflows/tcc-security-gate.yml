@@ -94,7 +94,9 @@ jobs:
       - name: npm audit (high+)
         id: npm-audit
         continue-on-error: true
-        run: npm audit --audit-level=high
+        # --omit=dev: devDependencies (jest/ts-jest/typescript-eslint) nunca chegam
+        # ao dist/server.js; nao falhar o gate por CVE que so afeta o toolchain de teste.
+        run: npm audit --omit=dev --audit-level=high
       - name: npm audit JSON
         if: always()
         run: npm audit --json > npm-audit-report.json || true
@@ -284,6 +286,7 @@ jobs:
                 PORT: "4000"
                 BACKEND_URL: http://usuario-service:3333
                 QUIZ_SERVICE_URL: http://quiz-service:3334
+                CHATBOT_OSCE_URL: http://chatbot-osce:3335
                 AI_URL: ""
                 JWT_SECRET_KEY: ${DAST_JWT_SECRET_KEY}
                 INTERNAL_TOKEN: ${DAST_INTERNAL_TOKEN}

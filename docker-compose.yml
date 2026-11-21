@@ -14,6 +14,7 @@ services:
       CORS_ORIGINS: ${DOCKER_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080}
       BACKEND_URL: ${DOCKER_BACKEND_URL:-http://host.docker.internal:3333}
       QUIZ_SERVICE_URL: ${DOCKER_QUIZ_SERVICE_URL:-http://host.docker.internal:3334}
+      CHATBOT_OSCE_URL: ${DOCKER_CHATBOT_OSCE_URL:-http://host.docker.internal:3335}
     ports:
       - "${PORT:-4000}:${PORT:-4000}"
     extra_hosts:

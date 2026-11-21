@@ -4,7 +4,6 @@ import { adminRouter } from "@/routes/admin.routes";
 import { authRouter } from "@/routes/auth.routes";
 import { exemplosRouter } from "@/routes/exemplos.routes";
 import { iaRouter } from "@/routes/ia.routes";
-import { osceRouter } from "@/routes/osce.routes";
 import { questoesRouter } from "@/routes/questoes.routes";
 import { turmasRouter } from "@/routes/turmas.routes";
 import { usuariosRouter } from "@/routes/usuarios.routes";
@@ -13,6 +12,7 @@ import { turmaDashboardRouter } from "./dashboardTurma.routes";
 import { dashboardAlunoRouter } from "./dashboardAluno.routes";
 import { listasAlunoRouter } from "./listasAlunos.routes";
 
+import { chatbotOsceClient } from "@/shared/clients/chatbotOsce.client";
 import { quizClient } from "@/shared/clients/quiz.client";
 import { criarProxyHandler } from "@/shared/middlewares/proxy.middleware";
 import { middlewareAutenticacao } from "@/shared/middlewares/autenticacao.middleware";
@@ -47,7 +47,15 @@ apiRouter.use("/exemplos", exemplosRouter);
 apiRouter.use("/questoes", questoesRouter);
 // Precisa vir antes de "/ia": o catch-all de iaRouter intercepta qualquer sub-rota
 // nao mapeada em /ia/*, inclusive /ia/osce/*, se montado primeiro.
-apiRouter.use("/ia/osce", osceRouter);
+// Simulacao OSCE mora no ChatbotOSCE (DA-07); o BFF so repassa a chamada. O
+// ChatbotOSCE monta as rotas em /osce (sem o prefixo /api/v1/ia que o BFF usa).
+apiRouter.use(
+  "/ia/osce",
+  middlewareAutenticacao,
+  criarProxyHandler(chatbotOsceClient, {
+    montarUrl: (request) => request.originalUrl.replace(/^\/api\/v1\/ia\/osce/, "/osce"),
+  }),
+);
 apiRouter.use("/ia", iaRouter);
 apiRouter.use("/turmas", turmasRouter);
 apiRouter.use("/usuarios", usuariosRouter);

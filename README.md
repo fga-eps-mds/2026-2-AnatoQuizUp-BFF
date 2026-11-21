@@ -56,6 +56,7 @@ LOG_LEVEL=info
 
 BACKEND_URL=http://localhost:3333
 QUIZ_SERVICE_URL=http://localhost:3334
+CHATBOT_OSCE_URL=http://localhost:3335
 AI_URL=
 
 # !!! DEVE ser idêntico ao INTERNAL_TOKEN do Backend e do Quiz-Service !!!
@@ -185,6 +186,7 @@ Qualquer outro path de autenticação exige `Authorization: Bearer <accessToken>
 | `LOG_LEVEL` | não | `info` | Nível Pino |
 | `BACKEND_URL` | sim | `http://localhost:3333` | URL base do Backend/Auth (em prod, `http://${{Backend.RAILWAY_PRIVATE_DOMAIN}}:3333`) |
 | `QUIZ_SERVICE_URL` | sim | `http://localhost:3334` | URL base do Quiz-Service (em prod, domínio privado do Railway) |
+| `CHATBOT_OSCE_URL` | sim | `http://localhost:3335` | URL base do ChatbotOSCE, usado em `/ia/osce/*` (em prod, domínio privado do Railway) |
 | `AI_URL` | não | `""` | URL base do AI; vazio enquanto AI estiver placeholder |
 | `INTERNAL_TOKEN` | sim | — | Segredo compartilhado com Backend/Auth, Quiz-Service e AI |
 | `JWT_SECRET_KEY` | sim | — | Mesmo segredo do Backend (validação local de access token) |
