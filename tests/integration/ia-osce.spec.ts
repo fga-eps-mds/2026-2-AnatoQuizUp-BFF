@@ -67,7 +67,7 @@ describe("ia/osce - proxy para o ChatbotOSCE", () => {
     expect(chatbotOsceMock.request).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: expect.objectContaining({
-          "x-internal-token": "test-internal-token",
+          "x-internal-token": process.env.INTERNAL_TOKEN,
           "x-user-id": "u1",
           "x-user-papel": "ALUNO",
           "x-user-status": "ATIVO",
