@@ -101,4 +101,47 @@ describe("ia/osce - proxy para o ChatbotOSCE", () => {
     expect(resposta.status).toBe(504);
     expect(resposta.body.erro.codigo).toBe("TIMEOUT_DOWNSTREAM");
   });
+
+  // Confirma que /melhorar-texto (botao de IA do editor de caso, ChatbotOSCE PR #5)
+  // ja passa pelo proxy generico de /ia/osce sem precisar de nenhuma rota dedicada no
+  // BFF: o rewrite de montarUrl e o corpo/metodo sao repassados como vieram. O BFF nao
+  // decide papel (PROFESSOR vs ALUNO) aqui — isso e responsabilidade do ChatbotOSCE.
+  it("repassa POST /melhorar-texto (corpo e metodo) ao ChatbotOSCE sem rota dedicada", async () => {
+    chatbotOsceMock.request.mockResolvedValue({
+      status: 200,
+      data: { textoMelhorado: "Paciente relata dor toracica ha dois dias." },
+      headers: {},
+    });
+
+    const resposta = await request(aplicacao)
+      .post("/api/v1/ia/osce/melhorar-texto")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ campo: "titulo", texto: "paciente c/ dor no peito ha 2 dias" });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toEqual({ textoMelhorado: "Paciente relata dor toracica ha dois dias." });
+    expect(chatbotOsceMock.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "POST",
+        url: "/osce/melhorar-texto",
+        data: { campo: "titulo", texto: "paciente c/ dor no peito ha 2 dias" },
+      }),
+    );
+  });
+
+  it("repassa 403 do ChatbotOSCE quando o usuario autenticado nao e professor", async () => {
+    chatbotOsceMock.request.mockResolvedValue({
+      status: 403,
+      data: { erro: { codigo: "PROIBIDO", mensagem: "Este recurso e exclusivo para professores." } },
+      headers: {},
+    });
+
+    const resposta = await request(aplicacao)
+      .post("/api/v1/ia/osce/melhorar-texto")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ campo: "titulo", texto: "paciente c/ dor no peito" });
+
+    expect(resposta.status).toBe(403);
+    expect(resposta.body.erro.codigo).toBe("PROIBIDO");
+  });
 });
