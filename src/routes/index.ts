@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 
+import { env } from "@/config/env";
 import { adminRouter } from "@/routes/admin.routes";
 import { authRouter } from "@/routes/auth.routes";
 import { exemplosRouter } from "@/routes/exemplos.routes";
@@ -20,6 +21,7 @@ import { amizadeRouter } from "./amizade.routes";
 import { perfilSocialRouter } from "@/modules/perfil-social/perfil-social.routes";
 import { CodigoDeErro } from "@/shared/errors/codigos-de-erro";
 import { ErroAplicacao } from "@/shared/errors/erro-aplicacao";
+import { MENSAGENS } from "@/shared/constants/mensagens";
 import { inventarioRouter } from "./inventario.routes";
 import { rankingRouter } from "@/modules/ranking/ranking.routes";
 
@@ -38,6 +40,18 @@ const bloquearRotaInterna = (_request: Request, _response: Response, next: NextF
     }),
   );
 
+// O OSCE depende de um microsservico proprio. Enquanto ele nao estiver
+// configurado no ambiente, mantemos o restante da API disponivel e devolvemos
+// uma resposta explicita para a funcionalidade ainda indisponivel.
+const responderOsceIndisponivel = (_request: Request, _response: Response, next: NextFunction) =>
+  next(
+    new ErroAplicacao({
+      codigoStatus: 503,
+      codigo: CodigoDeErro.IA_INDISPONIVEL,
+      mensagem: MENSAGENS.iaIndisponivel,
+    }),
+  );
+
 // Mapa de roteamento do BFF: cada prefixo aponta para um router proprio ou faz proxy
 // direto ao servico de destino. As rotas com router proprio cuidam da sua autenticacao;
 // as de proxy direto exigem o middlewareAutenticacao explicitamente aqui.
@@ -49,13 +63,17 @@ apiRouter.use("/questoes", questoesRouter);
 // nao mapeada em /ia/*, inclusive /ia/osce/*, se montado primeiro.
 // Simulacao OSCE mora no ChatbotOSCE (DA-07); o BFF so repassa a chamada. O
 // ChatbotOSCE monta as rotas em /osce (sem o prefixo /api/v1/ia que o BFF usa).
-apiRouter.use(
-  "/ia/osce",
-  middlewareAutenticacao,
-  criarProxyHandler(chatbotOsceClient, {
-    montarUrl: (request) => request.originalUrl.replace(/^\/api\/v1\/ia\/osce/, "/osce"),
-  }),
-);
+if (env.CHATBOT_OSCE_URL) {
+  apiRouter.use(
+    "/ia/osce",
+    middlewareAutenticacao,
+    criarProxyHandler(chatbotOsceClient, {
+      montarUrl: (request) => request.originalUrl.replace(/^\/api\/v1\/ia\/osce/, "/osce"),
+    }),
+  );
+} else {
+  apiRouter.use("/ia/osce", middlewareAutenticacao, responderOsceIndisponivel);
+}
 apiRouter.use("/ia", iaRouter);
 apiRouter.use("/turmas", turmasRouter);
 apiRouter.use("/usuarios", usuariosRouter);
