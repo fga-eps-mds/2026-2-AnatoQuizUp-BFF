@@ -1,5 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import request from "supertest";
 
+import { aplicacao } from "@/config/app";
 import { backendClient } from "@/shared/clients/backend.client";
 import { quizClient } from "@/shared/clients/quiz.client";
 import { CodigoDeErro } from "@/shared/errors/codigos-de-erro";
@@ -13,6 +16,14 @@ jest.mock("@/shared/clients/backend.client", () => ({
 
 jest.mock("@/shared/clients/quiz.client", () => ({
   quizClient: { get: jest.fn() },
+}));
+
+jest.mock("@/shared/clients/gemini.client", () => ({
+  geminiClient: null,
+}));
+
+jest.mock("@/shared/clients/chatbotOsce.client", () => ({
+  chatbotOsceClient: { request: jest.fn() },
 }));
 
 const backendGet = backendClient.get as jest.Mock;
@@ -298,5 +309,44 @@ describe("PerfilSocialController", () => {
     );
 
     expect(next).toHaveBeenCalledWith(erro);
+  });
+});
+
+describe("GET /api/v1/perfis/:usuarioId/social - validacao do id na rota", () => {
+  const SEGREDO = process.env.JWT_SECRET_KEY ?? "test-secret";
+  const tokenValido = () =>
+    jwt.sign({ sub: usuario.id, papel: "ALUNO", status: "ATIVO" }, SEGREDO, {
+      expiresIn: "5m",
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("corta com 400 antes de acionar o controller quando o usuarioId e so espaco", async () => {
+    const resposta = await request(aplicacao)
+      .get("/api/v1/perfis/%20/social")
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.erro.codigo).toBe("REQUISICAO_INVALIDA");
+    expect(backendGet).not.toHaveBeenCalled();
+  });
+
+  test("segue para o controller quando o usuarioId e valido", async () => {
+    backendGet.mockResolvedValue({
+      data: {
+        dados: [amizade],
+        metadados: { ...metadados, page: 1, totalPages: 1 },
+      },
+    });
+    quizGet.mockResolvedValue({ data: { dados: {} } });
+
+    const resposta = await request(aplicacao)
+      .get(`/api/v1/perfis/${amigo.id}/social`)
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(200);
+    expect(backendGet).toHaveBeenCalled();
   });
 });

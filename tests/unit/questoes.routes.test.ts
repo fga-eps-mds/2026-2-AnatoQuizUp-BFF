@@ -145,6 +145,20 @@ describe("questoesRouter", () => {
     expect(resposta.body.erro).toBe("Questao nao encontrada");
   });
 
+  test("rejeita upload com formato de arquivo nao suportado", async () => {
+    const resposta = await request(aplicacao)
+      .post("/api/v1/questoes")
+      .set("Authorization", `Bearer ${token}`)
+      .field("titulo", "Falha")
+      .attach("imagem", Buffer.from("conteudo-fake"), {
+        filename: "documento.pdf",
+        contentType: "application/pdf",
+      });
+
+    expect(resposta.status).toBe(500);
+    expect(quizPostMock).not.toHaveBeenCalled();
+  });
+
   test("retorna 500 generico se o Quiz-Service estourar erro sem resposta estruturada", async () => {
     quizPutMock.mockRejectedValueOnce(new Error("Erro interno fatal"));
 

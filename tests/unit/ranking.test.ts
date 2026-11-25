@@ -365,6 +365,33 @@ describe("RankingService.rankingLista", () => {
 
     expect(resultado.dados.map((e) => e.alunoId)).toEqual(["p", "q", "r", "t", "s"]);
   });
+
+  test("usa fallback de nome/nickname quando o Backend nao conhece o aluno", async () => {
+    quizGet.mockImplementation((url: string) => {
+      if (url.includes("/listas/")) {
+        return Promise.resolve({
+          data: {
+            listaTurmaId: "lt1",
+            nomeLista: "L",
+            totalQuestoes: 5,
+            desempenhoAlunos: [
+              { alunoId: "sem-cadastro", status: "SUBMETIDA", totalAcertos: 1, taxaAcerto: 100, submissaoEm: "2026-01-01T00:00:00.000Z" },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { dados: {} } });
+    });
+    backendGet.mockResolvedValue({ data: { dados: [] } });
+
+    const resultado = await service.rankingLista(usuarioProfessor, auth, "t1", "lt1");
+
+    expect(resultado.dados[0]).toMatchObject({
+      alunoId: "sem-cadastro",
+      nome: "Aluno",
+      nickname: null,
+    });
+  });
 });
 
 describe("RankingController", () => {
@@ -444,6 +471,32 @@ describe("RankingController", () => {
     service.rankingAmigos.mockRejectedValue(erro);
 
     await controller.amigos({ ...baseReq, query: {} } as unknown as Request, response, next);
+
+    expect(next).toHaveBeenCalledWith(erro);
+  });
+
+  test("turma encaminha erro do service para o next", async () => {
+    const erro = new Error("downstream");
+    service.rankingTurma.mockRejectedValue(erro);
+
+    await controller.turma(
+      { ...baseReq, params: { turmaId: "t1" } } as never,
+      response,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(erro);
+  });
+
+  test("lista encaminha erro do service para o next", async () => {
+    const erro = new Error("downstream");
+    service.rankingLista.mockRejectedValue(erro);
+
+    await controller.lista(
+      { ...baseReq, params: { turmaId: "t1", listaId: "l1" } } as never,
+      response,
+      next,
+    );
 
     expect(next).toHaveBeenCalledWith(erro);
   });

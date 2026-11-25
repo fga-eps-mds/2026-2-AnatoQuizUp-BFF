@@ -530,3 +530,54 @@ describe("/api/v1/missoes - proxy autenticado", () => {
     });
   });
 });
+
+describe("/api/v1/casos-osce - proxy autenticado (US26)", () => {
+  it("nega requisição sem token", async () => {
+    const resposta = await request(aplicacao).get("/api/v1/casos-osce");
+    expect(resposta.status).toBe(401);
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it("encaminha o metodo, a url e a identidade do JWT pro Quiz-Service", async () => {
+    quizMock.request.mockResolvedValue({
+      status: 201,
+      data: { mensagem: "Caso OSCE criado com sucesso.", dados: { id: "caso-1" } },
+      headers: {},
+    });
+
+    const resposta = await request(aplicacao)
+      .post("/api/v1/casos-osce")
+      .set("Authorization", `Bearer ${tokenValido()}`)
+      .send({ titulo: "Dor torácica" });
+
+    expect(resposta.status).toBe(201);
+    expect(quizMock.request.mock.calls[0][0]).toMatchObject({
+      method: "POST",
+      url: "/api/v1/casos-osce",
+      headers: { "x-user-id": "u1" },
+    });
+  });
+});
+
+describe("rotas internas bloqueadas (uso exclusivo de ranking/perfil social)", () => {
+  it.each([
+    "/api/v1/inventario/usuarios/equipados",
+    "/api/v1/conquistas/usuarios/destaques",
+  ])("responde 404 para GET %s mesmo autenticado, sem acionar o proxy", async (caminho) => {
+    const resposta = await request(aplicacao)
+      .get(caminho)
+      .set("Authorization", `Bearer ${tokenValido()}`);
+
+    expect(resposta.status).toBe(404);
+    expect(resposta.body.erro.codigo).toBe("NAO_ENCONTRADO");
+    expect(quizMock.request).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "/api/v1/inventario/usuarios/equipados",
+    "/api/v1/conquistas/usuarios/destaques",
+  ])("exige token antes mesmo de bloquear GET %s", async (caminho) => {
+    const resposta = await request(aplicacao).get(caminho);
+    expect(resposta.status).toBe(401);
+  });
+});
