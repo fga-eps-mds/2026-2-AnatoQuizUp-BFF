@@ -47,7 +47,7 @@ async function buscarCatalogoDoAluno(request: Request): Promise<ItemCatalogo[]> 
 
   const itens: ItemCatalogo[] = [];
   let pagina = 1;
-  let totalPaginas = 1;
+  let totalPaginas: number;
   do {
     const { data } = await quizClient.get<RespostaCatalogo>("/api/v1/loja/catalogo", {
       params: { page: pagina, limit: LIMITE_PAGINA_CATALOGO },
