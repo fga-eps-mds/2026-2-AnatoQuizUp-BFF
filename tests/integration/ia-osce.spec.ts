@@ -1,3 +1,8 @@
+// O proxy do OSCE so e montado quando CHATBOT_OSCE_URL existe (sem ela o BFF responde
+// 503). O teste define a variavel antes de carregar a aplicacao para nao depender do
+// .env de quem roda (no CI ela nao existe).
+process.env.CHATBOT_OSCE_URL ??= "http://chatbot-osce.test";
+
 import { AxiosError } from "axios";
 import jwt from "jsonwebtoken";
 import request from "supertest";
